@@ -1,127 +1,157 @@
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
+/* ===== Neon Terminal Design System ===== */
+:root {
+    --bg-pure: #000000;
+    --bg-noise: #080808;
+    --green-primary: #00ff41;
+    --green-dim: #008f11;
+    --green-bright: #39ff14;
+    --white-pure: #ffffff;
+    --gray-dim: #333333;
+    --terminal-glow: 0 0 10px rgba(0, 255, 65, 0.3);
+    --scan-line: rgba(0, 255, 65, 0.03);
+    
+    --radius-sm: 2px;
+    --radius-md: 4px;
+    
+    --font-mono: 'Consolas', 'Monaco', 'Courier New', monospace;
 }
 
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
 body {
-    background: #020410;
+    background: var(--bg-pure);
     display: flex;
     justify-content: center;
     align-items: center;
     min-height: 100vh;
-    font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif;
+    font-family: var(--font-mono);
     overflow: hidden;
 }
 
+/* 游戏容器 */
 #game-container {
     position: relative;
     width: 480px;
     height: 720px;
-    border: 1px solid rgba(0, 100, 200, 0.3);
-    border-radius: 4px;
+    border: 2px solid var(--green-primary);
+    border-radius: var(--radius-sm);
     overflow: hidden;
-    box-shadow:
-        0 0 30px rgba(0, 100, 200, 0.2),
-        0 0 60px rgba(0, 60, 150, 0.1),
-        inset 0 0 30px rgba(0, 50, 120, 0.1);
+    box-shadow: var(--terminal-glow), 0 0 20px rgba(0, 255, 65, 0.1);
+    background: var(--bg-pure);
 }
 
 #gameCanvas {
     display: block;
     width: 100%;
     height: 100%;
-    background: #030518;
 }
 
+/* 覆盖层 */
 .overlay {
     position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    background: rgba(2, 4, 16, 0.88);
-    backdrop-filter: blur(4px);
+    background: rgba(0, 0, 0, 0.92);
     z-index: 10;
-    transition: opacity 0.3s ease;
+    opacity: 1;
+    transition: opacity 0.2s ease;
 }
 
 .overlay.hidden {
-    display: none;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
 }
 
+/* 终端风格卡片 */
+.terminal-card {
+    border: 1px solid var(--green-primary);
+    background: rgba(0, 0, 0, 0.8);
+    padding: 32px 40px;
+    text-align: center;
+    position: relative;
+    box-shadow: var(--terminal-glow), inset 0 0 20px rgba(0, 255, 65, 0.05);
+    animation: terminalGlow 2s ease-in-out infinite alternate;
+}
+
+.terminal-card::before {
+    content: '>';
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    color: var(--green-primary);
+    font-size: 14px;
+}
+
+.terminal-card::after {
+    content: '_';
+    position: absolute;
+    bottom: 12px;
+    right: 12px;
+    color: var(--green-primary);
+    font-size: 14px;
+    animation: cursorBlink 1s step-end infinite;
+}
+
+@keyframes terminalGlow {
+    from { box-shadow: var(--terminal-glow), inset 0 0 20px rgba(0, 255, 65, 0.05); }
+    to { box-shadow: var(--terminal-glow), inset 0 0 30px rgba(0, 255, 65, 0.08); }
+}
+
+@keyframes cursorBlink {
+    0%, 50% { opacity: 1; }
+    51%, 100% { opacity: 0; }
+}
+
+/* 标题 */
 .game-title {
-    font-size: 40px;
-    font-weight: 900;
-    color: #00d4ff;
-    text-shadow:
-        0 0 10px rgba(0, 212, 255, 0.8),
-        0 0 30px rgba(0, 180, 255, 0.4),
-        0 0 60px rgba(0, 140, 255, 0.2);
-    margin-bottom: 6px;
-    letter-spacing: 10px;
-    animation: titleGlow 3s ease-in-out infinite;
-}
-
-@keyframes titleGlow {
-    0%, 100% { text-shadow: 0 0 10px rgba(0, 212, 255, 0.8), 0 0 30px rgba(0, 180, 255, 0.4), 0 0 60px rgba(0, 140, 255, 0.2); }
-    50% { text-shadow: 0 0 15px rgba(0, 212, 255, 1), 0 0 40px rgba(0, 180, 255, 0.6), 0 0 80px rgba(0, 140, 255, 0.3); }
+    font-family: var(--font-mono);
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--green-primary);
+    text-shadow: var(--terminal-glow);
+    margin-bottom: 8px;
+    letter-spacing: 8px;
+    text-transform: uppercase;
 }
 
 .subtitle {
-    color: rgba(100, 140, 180, 0.6);
-    font-size: 13px;
-    margin-bottom: 50px;
-    letter-spacing: 6px;
+    color: var(--green-dim);
+    font-size: 11px;
+    margin-bottom: 32px;
+    letter-spacing: 4px;
     text-transform: uppercase;
 }
 
 .overlay h1 {
-    color: #00d4ff;
-    font-size: 32px;
-    font-weight: 800;
-    text-shadow: 0 0 15px rgba(0, 212, 255, 0.5);
+    font-family: var(--font-mono);
+    color: var(--green-primary);
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 6px;
     margin-bottom: 24px;
-    letter-spacing: 8px;
+    text-transform: uppercase;
 }
 
-.overlay p {
-    color: #8ab4d0;
-    font-size: 18px;
-    margin-bottom: 8px;
-}
-
-#final-score {
-    font-size: 32px !important;
-    color: #ffdd44 !important;
-    text-shadow: 0 0 15px rgba(255, 221, 68, 0.5);
-    margin-bottom: 8px !important;
-    font-weight: bold;
-}
-
-#best-score {
-    color: rgba(120, 160, 200, 0.7) !important;
-    font-size: 15px !important;
-    margin-bottom: 36px !important;
-}
-
+/* 按钮风格 */
 .btn {
-    padding: 12px 44px;
-    font-size: 15px;
-    font-weight: bold;
-    border: 1px solid rgba(0, 180, 255, 0.5);
-    background: rgba(0, 100, 200, 0.1);
-    color: #00d4ff;
-    border-radius: 4px;
+    display: inline-block;
+    padding: 12px 40px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    color: var(--green-primary);
+    background: rgba(0, 0, 0, 0.6);
+    border: 2px solid var(--green-primary);
     cursor: pointer;
-    margin-top: 14px;
-    letter-spacing: 4px;
-    transition: all 0.25s ease;
-    font-family: inherit;
+    margin-top: 16px;
+    text-transform: uppercase;
+    transition: all 0.2s ease;
     position: relative;
     overflow: hidden;
 }
@@ -129,11 +159,10 @@ body {
 .btn::before {
     content: '';
     position: absolute;
-    top: 0;
-    left: -100%;
+    top: 0; left: -100%;
     width: 100%;
     height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(0, 200, 255, 0.1), transparent);
+    background: linear-gradient(90deg, transparent, rgba(0, 255, 65, 0.2), transparent);
     transition: left 0.4s ease;
 }
 
@@ -142,39 +171,223 @@ body {
 }
 
 .btn:hover {
-    background: rgba(0, 180, 255, 0.2);
-    border-color: rgba(0, 200, 255, 0.8);
-    box-shadow: 0 0 20px rgba(0, 180, 255, 0.3);
-    text-shadow: 0 0 8px rgba(0, 212, 255, 0.6);
+    background: rgba(0, 255, 65, 0.15);
+    box-shadow: var(--terminal-glow), 0 0 30px rgba(0, 255, 65, 0.3);
+    text-shadow: 0 0 10px rgba(0, 255, 65, 0.8);
 }
 
 .btn:active {
-    transform: scale(0.97);
+    transform: scale(0.98);
 }
 
 .btn-secondary {
-    border-color: rgba(80, 120, 160, 0.4);
-    color: rgba(100, 150, 190, 0.8);
-    font-size: 13px;
-    padding: 9px 32px;
-    background: rgba(40, 60, 100, 0.08);
+    border-color: var(--gray-dim);
+    color: var(--gray-dim);
+    padding: 10px 32px;
+    font-size: 12px;
 }
 
 .btn-secondary:hover {
-    background: rgba(80, 120, 160, 0.15);
-    border-color: rgba(100, 150, 190, 0.6);
-    color: #8ab4d0;
-    box-shadow: 0 0 15px rgba(80, 120, 160, 0.2);
+    border-color: var(--green-dim);
+    color: var(--green-dim);
+    box-shadow: 0 0 15px rgba(0, 143, 17, 0.2);
 }
 
+/* 操作说明 */
 .controls-info {
-    margin-top: 50px;
+    margin-top: 24px;
     text-align: center;
+    border-top: 1px solid var(--green-dim);
+    padding-top: 16px;
 }
 
 .controls-info p {
-    color: rgba(70, 100, 130, 0.7);
-    font-size: 12px;
+    color: var(--green-dim);
+    font-size: 10px;
     margin-bottom: 6px;
     letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+/* 结算界面 */
+#final-score {
+    font-size: 40px !important;
+    font-weight: 700;
+    color: var(--green-bright);
+    margin-bottom: 8px !important;
+    text-shadow: 0 0 20px rgba(57, 255, 20, 0.5);
+    letter-spacing: 4px;
+}
+
+#best-score {
+    color: var(--green-dim);
+    font-size: 12px !important;
+    margin-bottom: 24px !important;
+    letter-spacing: 2px;
+}
+
+.result-rank {
+    font-family: var(--font-mono);
+    font-size: 72px;
+    font-weight: 900;
+    color: var(--green-bright);
+    text-shadow: 0 0 30px rgba(57, 255, 20, 0.6);
+    margin-bottom: 12px;
+    animation: rankGlitch 0.5s ease-out 0.1s both;
+}
+
+@keyframes rankGlitch {
+    0% { opacity: 0; transform: translateX(-10px) skewX(20deg); }
+    50% { opacity: 1; transform: translateX(5px) skewX(-10deg); }
+    100% { opacity: 1; transform: translateX(0) skewX(0); }
+}
+
+.result-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.result-stats span {
+    font-size: 10px;
+    color: var(--green-dim);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+/* Boss 警告效果 */
+.boss-warning {
+    animation: warningPulse 0.5s ease-in-out infinite;
+}
+
+@keyframes warningPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+/* ===== 主题选择器 ===== */
+.theme-title {
+    font-size: 20px !important;
+    letter-spacing: 6px;
+    margin-bottom: 4px !important;
+}
+
+.theme-subtitle {
+    color: var(--green-dim);
+    font-size: 10px;
+    letter-spacing: 2px;
+    margin-bottom: 20px;
+    text-transform: uppercase;
+}
+
+.theme-card-container {
+    max-width: 420px;
+    width: 90%;
+    padding: 24px 20px !important;
+}
+
+.theme-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 10px;
+    margin-bottom: 16px;
+}
+
+.theme-card {
+    border: 1px solid var(--gray-dim);
+    background: rgba(0, 0, 0, 0.6);
+    padding: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: center;
+    position: relative;
+}
+
+.theme-card:hover {
+    border-color: var(--green-dim);
+    background: rgba(0, 255, 65, 0.05);
+}
+
+.theme-card.selected {
+    border-color: var(--green-primary);
+    background: rgba(0, 255, 65, 0.1);
+    box-shadow: 0 0 15px rgba(0, 255, 65, 0.2);
+}
+
+.theme-card.selected::after {
+    content: '>';
+    position: absolute;
+    top: 4px;
+    right: 6px;
+    color: var(--green-primary);
+    font-size: 10px;
+    animation: cursorBlink 1s step-end infinite;
+}
+
+.theme-preview {
+    width: 100%;
+    height: 80px;
+    border: 1px solid var(--gray-dim);
+    margin-bottom: 6px;
+    image-rendering: pixelated;
+}
+
+.theme-card.selected .theme-preview {
+    border-color: var(--green-dim);
+}
+
+.theme-name {
+    color: var(--green-primary);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 2px;
+}
+
+.theme-desc {
+    color: var(--green-dim);
+    font-size: 9px;
+    letter-spacing: 1px;
+    margin-bottom: 4px;
+}
+
+.theme-colors {
+    display: flex;
+    justify-content: center;
+    gap: 4px;
+}
+
+.color-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+.theme-confirm-btn {
+    margin-top: 4px;
+}
+
+/* 响应式 */
+@media (max-width: 520px) {
+    #game-container {
+        width: 100vw;
+        height: 100vh;
+        border-radius: 0;
+    }
+    .terminal-card {
+        padding: 24px 28px;
+    }
+    .game-title {
+        font-size: 20px;
+        letter-spacing: 4px;
+    }
+    .theme-cards {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+    }
+    .theme-card-container {
+        padding: 16px 12px !important;
+    }
 }

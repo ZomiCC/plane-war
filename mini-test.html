@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Test</title>
+</head>
+<body style="background: #000; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0;">
+    <div style="border: 2px solid #00ff41; position: relative;">
+        <canvas id="gameCanvas" width="480" height="720"></canvas>
+    </div>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        let frame = 0;
+        
+        function render() {
+            frame++;
+            
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, 480, 720);
+            
+            ctx.strokeStyle = 'rgba(0, 255, 65, 0.08)';
+            ctx.lineWidth = 0.5;
+            for (let x = 0; x < 480; x += 20) {
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 720); ctx.stroke();
+            }
+            for (let y = 0; y < 720; y += 20) {
+                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(480, y); ctx.stroke();
+            }
+            
+            ctx.save();
+            ctx.translate(240 + Math.sin(frame * 0.02) * 50, 580);
+            ctx.strokeStyle = '#00ff41';
+            ctx.lineWidth = 2;
+            ctx.fillStyle = 'rgba(0, 255, 65, 0.2)';
+            ctx.beginPath();
+            ctx.moveTo(0, -18);
+            ctx.lineTo(-16, 18);
+            ctx.lineTo(0, 10);
+            ctx.lineTo(16, 18);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            ctx.restore();
+            
+            const enemyY = (frame * 2) % 720;
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(150, enemyY, 24, 24);
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+            ctx.fillRect(150, enemyY, 24, 24);
+            
+            ctx.fillStyle = '#00ff41';
+            ctx.fillRect(240 - 1, 100 + (frame * 5) % 600, 2, 12);
+            
+            requestAnimationFrame(render);
+        }
+        
+        render();
+    </script>
+</body>
+</html>

@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>TEST</title>
+</head>
+<body>
+    <canvas id="testCanvas" width="480" height="720"></canvas>
+    <script>
+        const canvas = document.getElementById('testCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // 测试背景
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(0, 0, 480, 720);
+        
+        // 测试网格
+        ctx.strokeStyle = 'rgba(0, 255, 65, 0.08)';
+        ctx.lineWidth = 0.5;
+        for (let x = 0; x < 480; x += 20) {
+            ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 720); ctx.stroke();
+        }
+        for (let y = 0; y < 720; y += 20) {
+            ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(480, y); ctx.stroke();
+        }
+        
+        // 测试三角形玩家
+        ctx.save();
+        ctx.translate(240, 580);
+        ctx.strokeStyle = '#00ff41';
+        ctx.lineWidth = 2;
+        ctx.fillStyle = 'rgba(0, 255, 65, 0.2)';
+        ctx.beginPath();
+        ctx.moveTo(0, -18);
+        ctx.lineTo(-16, 18);
+        ctx.lineTo(0, 10);
+        ctx.lineTo(16, 18);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+        
+        console.log('Test rendered');
+    </script>
+</body>
+</html>

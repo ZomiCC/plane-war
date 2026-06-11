@@ -1,4 +1,3 @@
-// 游戏主控制器
 class Game {
     constructor() {
         this.canvas = document.getElementById('gameCanvas');
@@ -7,7 +6,12 @@ class Game {
         this.canvas.height = 720;
 
         this.ui = new UI();
-        this.state = 'menu';
+        this.state = 'theme'; // 初始状态改为主题选择
+
+        // 主题系统
+        this.themeManager = themeManager;
+        this.themeSelector = new ThemeSelector();
+        this.renderers = null; // 在主题确认后初始化
 
         this.player = null;
         this.bullets = [];
@@ -15,7 +19,8 @@ class Game {
         this.props = [];
         this.explosions = [];
         this.stars = [];
-        this.nebulaClouds = [];
+        this.floatingTexts = [];
+        this.glitchChars = [];
         this.shootingStars = [];
 
         this.keys = {};
@@ -34,73 +39,127 @@ class Game {
 
         this.spawnRate = 60;
         this.enemySpeedMult = 1;
+        this.killCount = 0;
+        this.propCount = 0;
+        this.combo = 0;
+        this.screenShake = { x: 0, y: 0, intensity: 0, duration: 0 };
+        this.bossWarning = { active: false, timer: 0, alpha: 0 };
+
+        this.scanlineCanvas = null;
+        this.vignetteCanvas = null;
 
         this.initStars();
-        this.initNebula();
+        this.initPostFX();
         this.bindEvents();
+
+        // 启动：先显示主题选择
+        this.showThemeSelection();
+    }
+
+    // ========== 主题选择流程 ==========
+
+    async showThemeSelection() {
+        this.state = 'theme';
+        this.ui.hideAll();
+
+        // 等待用户选择主题
+        const selectedThemeId = await this.themeSelector.show();
+
+        // 应用主题
+        this.themeManager.switchTheme(selectedThemeId);
+        this.themeManager.applyThemeToDOM();
+
+        // 初始化渲染器
+        this.renderers = this.themeManager.getRenderers();
+
+        // 重新生成后处理效果（因为主题可能改变参数）
+        this.initPostFX();
+
+        // 进入菜单
+        this.state = 'menu';
         this.ui.showMenu();
         this.menuLoop();
     }
 
+    // ========== 后处理效果 ==========
+
+    initPostFX() {
+        const theme = this.themeManager.getCurrentTheme();
+        const effectParams = theme ? theme.effectParams : { scanlineEnabled: true, scanlineIntensity: 0.04, vignetteEnabled: true };
+
+        // 扫描线
+        this.scanlineCanvas = document.createElement('canvas');
+        this.scanlineCanvas.width = 480;
+        this.scanlineCanvas.height = 720;
+        const slCtx = this.scanlineCanvas.getContext('2d');
+        if (effectParams.scanlineEnabled) {
+            slCtx.fillStyle = 'rgba(0, 0, 0, ' + (effectParams.scanlineIntensity || 0.04) + ')';
+            for (let y = 0; y < 720; y += 3) {
+                slCtx.fillRect(0, y, 480, 1);
+            }
+        }
+
+        // 暗角
+        this.vignetteCanvas = document.createElement('canvas');
+        this.vignetteCanvas.width = 480;
+        this.vignetteCanvas.height = 720;
+        const vCtx = this.vignetteCanvas.getContext('2d');
+        if (effectParams.vignetteEnabled) {
+            const intensity = effectParams.vignetteIntensity || 0.3;
+            const vg = vCtx.createRadialGradient(240, 360, 200, 240, 360, 420);
+            vg.addColorStop(0, 'rgba(0, 0, 0, 0)');
+            vg.addColorStop(0.75, 'rgba(0, 0, 0, ' + (intensity * 0.5) + ')');
+            vg.addColorStop(1, 'rgba(0, 0, 0, ' + intensity + ')');
+            vCtx.fillStyle = vg;
+            vCtx.fillRect(0, 0, 480, 720);
+        }
+    }
+
+    // ========== 星空初始化 ==========
+
     initStars() {
-        // 多层星空（远、中、近）
+        this.stars = [];
         for (let i = 0; i < 60; i++) {
             this.stars.push({
-                x: Math.random() * 480,
-                y: Math.random() * 720,
-                size: Math.random() * 1 + 0.3,
+                x: Math.random() * 480, y: Math.random() * 720,
+                size: Math.random() * 1 + 0.5,
                 speed: Math.random() * 0.5 + 0.2,
                 brightness: Math.random() * 0.3 + 0.1,
-                layer: 0 // 远景
+                flicker: Math.random() * 10
             });
         }
         for (let i = 0; i < 40; i++) {
             this.stars.push({
-                x: Math.random() * 480,
-                y: Math.random() * 720,
+                x: Math.random() * 480, y: Math.random() * 720,
                 size: Math.random() * 1.5 + 0.8,
                 speed: Math.random() * 1 + 0.8,
                 brightness: Math.random() * 0.4 + 0.3,
-                layer: 1 // 中景
+                flicker: Math.random() * 10
             });
         }
         for (let i = 0; i < 20; i++) {
             this.stars.push({
-                x: Math.random() * 480,
-                y: Math.random() * 720,
+                x: Math.random() * 480, y: Math.random() * 720,
                 size: Math.random() * 2 + 1,
                 speed: Math.random() * 1.5 + 1.5,
                 brightness: Math.random() * 0.5 + 0.5,
-                layer: 2 // 近景
+                flicker: Math.random() * 10
             });
         }
     }
 
-    initNebula() {
-        // 星云团
-        const colors = [
-            { r: 30, g: 10, b: 80 },
-            { r: 10, g: 30, b: 70 },
-            { r: 50, g: 10, b: 40 },
-            { r: 10, g: 40, b: 50 },
-            { r: 20, g: 20, b: 60 }
-        ];
-        for (let i = 0; i < 5; i++) {
-            const c = colors[i % colors.length];
-            this.nebulaClouds.push({
-                x: Math.random() * 480,
-                y: Math.random() * 720,
-                radius: 80 + Math.random() * 120,
-                color: c,
-                speed: 0.15 + Math.random() * 0.1,
-                phase: Math.random() * Math.PI * 2
-            });
-        }
-    }
+    // ========== 事件绑定 ==========
 
     bindEvents() {
         document.addEventListener('keydown', (e) => {
             this.keys[e.key] = true;
+
+            // 主题选择界面的键盘导航
+            if (this.state === 'theme' && this.themeSelector) {
+                this.themeSelector.handleKey(e.key);
+                return;
+            }
+
             if (e.key === 'p' || e.key === 'P') {
                 if (this.state === 'playing') this.pause();
                 else if (this.state === 'paused') this.resume();
@@ -132,22 +191,28 @@ class Game {
             this.mouseX = (e.touches[0].clientX - rect.left) * (this.canvas.width / rect.width);
             this.mouseY = (e.touches[0].clientY - rect.top) * (this.canvas.height / rect.height);
             this.useMouse = true;
-            this.mouseDown = true;
         }, { passive: false });
         this.canvas.addEventListener('touchend', () => { this.mouseDown = false; });
 
         document.getElementById('startBtn').addEventListener('click', () => this.start());
-        document.getElementById('resumeBtn').addEventListener('click', () => this.resume());
-        document.getElementById('restartBtn').addEventListener('click', () => this.start());
-        document.getElementById('restartBtnPause').addEventListener('click', () => this.start());
+        document.getElementById('restartBtn').addEventListener('click', () => this.restart());
+        const restartBtnPause = document.getElementById('restartBtnPause');
+        if (restartBtnPause) restartBtnPause.addEventListener('click', () => this.restart());
+        const resumeBtn = document.getElementById('resumeBtn');
+        if (resumeBtn) resumeBtn.addEventListener('click', () => this.resume());
     }
 
+    // ========== 游戏状态控制 ==========
+
     start() {
-        this.player = new Player(240, 620);
+        this.player = new Player(240, 580);
         this.bullets = [];
         this.enemies = [];
         this.props = [];
         this.explosions = [];
+        this.floatingTexts = [];
+        this.glitchChars = [];
+        this.shootingStars = [];
         this.frameCount = 0;
         this.gameTime = 0;
         this.spawnTimer = 0;
@@ -155,47 +220,63 @@ class Game {
         this.nextBossScore = 500;
         this.spawnRate = 60;
         this.enemySpeedMult = 1;
+        this.killCount = 0;
+        this.propCount = 0;
+        this.combo = 0;
+        this.screenShake = { x: 0, y: 0, intensity: 0, duration: 0 };
+        this.bossWarning = { active: false, timer: 0, alpha: 0 };
         this.state = 'playing';
         this.ui.hideAll();
-        this.gameLoop();
+        this.loop();
     }
 
-    pause() { this.state = 'paused'; this.ui.showPause(); }
-    resume() { this.state = 'playing'; this.ui.hidePause(); this.gameLoop(); }
+    restart() { this.start(); }
+
+    pause() {
+        this.state = 'paused';
+        this.ui.showPause();
+    }
+
+    resume() {
+        this.state = 'playing';
+        this.ui.hidePause();
+        this.loop();
+    }
 
     gameOver() {
         this.state = 'gameover';
         if (this.player.score > this.bestScore) {
             this.bestScore = this.player.score;
-            localStorage.setItem('planeWarBest', this.bestScore.toString());
+            localStorage.setItem('planeWarBest', this.bestScore);
         }
-        this.ui.showGameOver(this.player.score, this.bestScore);
+        const seconds = Math.floor(this.gameTime / 60);
+        this.ui.showGameOver(this.player.score, this.bestScore, this.killCount, this.propCount, seconds);
     }
 
+    // ========== 游戏循环 ==========
+
     menuLoop() {
-        if (this.state !== 'menu' && this.state !== 'gameover') return;
+        if (this.state !== 'menu') return;
         this.frameCount++;
         this.updateStars();
-        this.updateNebula();
         this.drawBackground();
         requestAnimationFrame(() => this.menuLoop());
     }
 
-    gameLoop() {
+    loop() {
         if (this.state !== 'playing') return;
         this.frameCount++;
         this.gameTime++;
-        this.update();
-        this.draw();
-        requestAnimationFrame(() => this.gameLoop());
-    }
 
-    update() {
         this.updateDifficulty();
-        this.player.update(this.keys, this.mouseX, this.mouseY, this.useMouse);
+        this.updateScreenShake();
+        this.updateBossWarning();
+        this.updateFloatingTexts();
+        this.updateGlitchChars();
 
-        if (this.autoFire || this.keys[' '] || this.mouseDown) {
-            if (this.player.canFire()) {
+        if (this.player && this.player.alive) {
+            this.player.update(this.keys, this.mouseX, this.mouseY, this.useMouse);
+            if ((this.autoFire || this.mouseDown || this.keys[' '] || this.keys['Space']) && this.player.canFire()) {
                 this.bullets.push(...this.player.fire());
             }
         }
@@ -204,24 +285,26 @@ class Game {
         this.bullets.forEach(b => b.update());
         this.bullets = this.bullets.filter(b => b.alive);
         this.enemies.forEach(e => e.update());
-        this.enemies.forEach(e => {
-            const eb = e.tryShoot();
-            if (eb) this.bullets.push(...eb);
-        });
+        this.enemies.forEach(e => { const eb = e.tryShoot(); if (eb) this.bullets.push(...eb); });
         this.enemies = this.enemies.filter(e => e.alive);
         this.props.forEach(p => p.update());
         this.props = this.props.filter(p => p.alive);
         this.explosions = this.explosions.filter(exp => { exp.timer++; return exp.timer < exp.maxTimer; });
         this.updateStars();
-        this.updateNebula();
         this.updateShootingStars();
         this.checkCollisions();
 
-        if (!this.player.alive) {
+        if (this.player && !this.player.alive) {
+            this.addScreenShake(12, 15);
             this.createExplosion(this.player.x, this.player.y, 'large');
             this.gameOver();
         }
+
+        this.draw();
+        requestAnimationFrame(() => this.loop());
     }
+
+    // ========== 更新逻辑 ==========
 
     updateDifficulty() {
         const level = Math.floor(this.gameTime / 1800) + 1;
@@ -232,10 +315,19 @@ class Game {
     spawnEnemies() {
         this.spawnTimer++;
         if (this.player.score >= this.nextBossScore && !this.bossSpawned) {
-            const boss = new Enemy('boss');
-            boss.speed *= this.enemySpeedMult;
-            this.enemies.push(boss);
-            this.bossSpawned = true;
+            if (!this.bossWarning.active) {
+                this.bossWarning = { active: true, timer: 80, alpha: 0 };
+            }
+            this.bossWarning.timer--;
+            this.bossWarning.alpha = Math.abs(Math.sin(this.frameCount * 0.15)) * 0.4;
+            if (this.bossWarning.timer <= 0) {
+                const boss = new Enemy('boss');
+                boss.speed *= this.enemySpeedMult;
+                this.enemies.push(boss);
+                this.bossSpawned = true;
+                this.bossWarning.active = false;
+                this.addScreenShake(8, 15);
+            }
             return;
         }
         if (this.bossSpawned && !this.enemies.some(e => e.type === 'boss' && e.alive)) {
@@ -257,6 +349,8 @@ class Game {
 
     checkCollisions() {
         const player = this.player;
+        if (!player) return;
+
         this.bullets.forEach(bullet => {
             if (!bullet.alive || bullet.isEnemy) return;
             this.enemies.forEach(enemy => {
@@ -266,16 +360,19 @@ class Game {
                     enemy.x - enemy.width / 2, enemy.y - enemy.height / 2, enemy.width, enemy.height
                 )) {
                     bullet.alive = false;
-                    if (enemy.hit()) {
+                    const destroyed = enemy.hit();
+                    if (destroyed) {
                         player.score += enemy.score;
-                        this.createExplosion(enemy.x, enemy.y, enemy.type === 'boss' ? 'boss' : enemy.type);
-                        if (enemy.type === 'boss' || Math.random() < 0.2) this.props.push(PropFactory.create(enemy.x, enemy.y));
-                        if (enemy.type === 'boss') {
-                            this.props.push(PropFactory.create(enemy.x - 30, enemy.y));
-                            this.props.push(PropFactory.create(enemy.x + 30, enemy.y));
+                        this.killCount++;
+                        this.combo++;
+                        const expType = enemy.type === 'boss' ? 'boss' : enemy.type;
+                        this.createExplosion(enemy.x, enemy.y, expType);
+                        this.addScreenShake(enemy.type === 'boss' ? 12 : enemy.type === 'large' ? 5 : 2, 8);
+                        this.addFloatingText(enemy.x, enemy.y, '+' + enemy.score, '#00ff41');
+                        if (this.combo > 1) {
+                            this.addFloatingText(enemy.x, enemy.y - 25, this.combo + 'x COMBO', '#39ff14');
                         }
-                    } else {
-                        this.createExplosion(bullet.x, bullet.y, 'tiny');
+                        if (Math.random() < 0.3) this.props.push(PropFactory.create(enemy.x, enemy.y));
                     }
                 }
             });
@@ -287,7 +384,11 @@ class Game {
                 player.x - player.width / 4, player.y - player.height / 4, player.width / 2, player.height / 2
             )) {
                 bullet.alive = false;
-                if (!player.hit()) this.createExplosion(player.x, player.y, 'tiny');
+                if (!player.hit()) {
+                    this.createExplosion(player.x, player.y, 'tiny');
+                    this.addScreenShake(3, 6);
+                    this.combo = 0;
+                }
             }
         });
         this.enemies.forEach(enemy => {
@@ -298,8 +399,10 @@ class Game {
             )) {
                 enemy.alive = false;
                 this.createExplosion(enemy.x, enemy.y, enemy.type);
+                this.addScreenShake(6, 8);
                 player.score += enemy.score;
                 player.hit();
+                this.combo = 0;
             }
         });
         this.props.forEach(prop => {
@@ -309,11 +412,14 @@ class Game {
                 player.x - player.width / 2, player.y - player.height / 2, player.width, player.height
             )) {
                 prop.alive = false;
+                this.propCount++;
                 const result = prop.applyTo(player);
+                this.addFloatingText(prop.x, prop.y, prop.type.toUpperCase(), '#00ff41');
                 if (result === 'bomb') {
                     this.enemies.forEach(e => {
                         if (e.alive) { e.alive = false; player.score += e.score; this.createExplosion(e.x, e.y, 'small'); }
                     });
+                    this.addScreenShake(10, 20);
                 }
                 this.createExplosion(prop.x, prop.y, 'prop');
             }
@@ -325,232 +431,267 @@ class Game {
     }
 
     createExplosion(x, y, type) {
-        const colors = {
-            tiny: ['#ffcc44', '#ff8822'],
-            small: ['#ff6644', '#ffaa22', '#ffdd44', '#ffffff'],
-            medium: ['#ff4422', '#ff8822', '#ffcc22', '#ffee66', '#ffffff'],
-            large: ['#ff2222', '#ff6622', '#ffaa22', '#ffdd44', '#ffffff'],
-            boss: ['#ff0022', '#ff4444', '#ff8822', '#ffcc22', '#ffffff', '#ff66ff'],
-            prop: ['#00ffaa', '#00ccff', '#ffffff']
-        };
-        const counts = { tiny: 5, small: 14, medium: 22, large: 32, boss: 50, prop: 10 };
-        const sizes = { tiny: 2, small: 3.5, medium: 4.5, large: 5.5, boss: 7, prop: 3 };
-        const speeds = { tiny: 1.5, small: 2.5, medium: 3.5, large: 4.5, boss: 5.5, prop: 2.5 };
-        const timers = { tiny: 12, small: 22, medium: 28, large: 35, boss: 45, prop: 18 };
-
-        const explosion = { x, y, particles: [], rings: [], timer: 0, maxTimer: timers[type] || 22 };
-
-        const count = counts[type] || 14;
+        const explosion = { x, y, particles: [], rings: [], timer: 0, maxTimer: 20 };
+        const count = type === 'boss' ? 40 : type === 'large' ? 25 : type === 'medium' ? 18 : type === 'small' ? 12 : 6;
         for (let i = 0; i < count; i++) {
-            const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.6;
-            const speed = (speeds[type] || 2.5) * (0.4 + Math.random() * 0.8);
+            const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.8;
+            const speed = (2 + Math.random() * 3) * (type === 'boss' ? 1.5 : 1);
             explosion.particles.push({
                 x: 0, y: 0,
                 vx: Math.cos(angle) * speed,
                 vy: Math.sin(angle) * speed,
-                size: (sizes[type] || 3) * (0.5 + Math.random()),
-                color: colors[type][Math.floor(Math.random() * colors[type].length)],
-                life: (timers[type] || 22) * (0.5 + Math.random() * 0.5),
-                maxLife: timers[type] || 22
+                size: 2 + Math.random() * 2,
+                color: '#00ff41',
+                glitch: Math.random() > 0.5
             });
         }
-
-        // 冲击波环
         if (type !== 'tiny') {
             explosion.rings.push({
                 radius: 0,
                 maxRadius: type === 'boss' ? 80 : type === 'large' ? 50 : type === 'medium' ? 40 : 30,
                 speed: type === 'boss' ? 3 : 2,
-                alpha: 0.6
+                alpha: 0.5
             });
         }
-
         this.explosions.push(explosion);
+        this.addGlitchChars(x, y);
     }
+
+    addFloatingText(x, y, text, color) {
+        this.floatingTexts.push({ x, y, text, color, life: 40, maxLife: 40 });
+    }
+
+    addGlitchChars(x, y) {
+        if (Math.random() > 0.3) return;
+        const chars = ['0', '1', 'A', 'B', 'C', 'X', 'Y', 'Z', '#', '@'];
+        for (let i = 0; i < 8; i++) {
+            this.glitchChars.push({
+                x: x + (Math.random() - 0.5) * 40,
+                y: y + (Math.random() - 0.5) * 40,
+                char: chars[Math.floor(Math.random() * chars.length)],
+                life: 10 + Math.random() * 15,
+                maxLife: 25,
+                vx: (Math.random() - 0.5) * 4,
+                vy: -Math.random() * 3 - 1
+            });
+        }
+    }
+
+    updateFloatingTexts() {
+        this.floatingTexts = this.floatingTexts.filter(t => { t.y -= 1.5; t.life--; return t.life > 0; });
+    }
+
+    updateGlitchChars() {
+        this.glitchChars = this.glitchChars.filter(g => { g.x += g.vx; g.y += g.vy; g.life--; return g.life > 0; });
+    }
+
+    addScreenShake(intensity, duration) {
+        if (intensity > this.screenShake.intensity || duration > this.screenShake.duration) {
+            this.screenShake.intensity = Math.max(this.screenShake.intensity, intensity);
+            this.screenShake.duration = Math.max(this.screenShake.duration, duration);
+        }
+    }
+
+    updateScreenShake() {
+        if (this.screenShake.duration > 0) {
+            const decay = this.screenShake.duration / (this.screenShake.duration + 1);
+            this.screenShake.x = (Math.random() - 0.5) * this.screenShake.intensity * decay;
+            this.screenShake.y = (Math.random() - 0.5) * this.screenShake.intensity * decay;
+            this.screenShake.duration--;
+            this.screenShake.intensity *= 0.9;
+        } else {
+            this.screenShake.x = 0;
+            this.screenShake.y = 0;
+        }
+    }
+
+    updateBossWarning() {}
 
     updateStars() {
         this.stars.forEach(star => {
             star.y += star.speed;
-            if (star.y > 722) {
-                star.y = -2;
-                star.x = Math.random() * 480;
-            }
+            if (star.y > 722) { star.y = -2; star.x = Math.random() * 480; }
         });
-        // 偶尔产生流星
+        // 流星
         if (Math.random() < 0.003) {
             this.shootingStars.push({
-                x: Math.random() * 480,
-                y: -10,
-                vx: (Math.random() - 0.3) * 3,
-                vy: 6 + Math.random() * 4,
-                life: 40 + Math.random() * 30,
-                maxLife: 40 + Math.random() * 30,
-                length: 30 + Math.random() * 20
+                x: Math.random() * 480, y: -10,
+                vx: (Math.random() - 0.5) * 5, vy: 8 + Math.random() * 6,
+                length: 20 + Math.random() * 40,
+                life: 40 + Math.random() * 30, maxLife: 70
             });
         }
     }
 
-    updateNebula() {
-        this.nebulaClouds.forEach(cloud => {
-            cloud.y += cloud.speed;
-            cloud.phase += 0.003;
-            if (cloud.y > 720 + cloud.radius) {
-                cloud.y = -cloud.radius;
-                cloud.x = Math.random() * 480;
-            }
-        });
-    }
-
     updateShootingStars() {
         this.shootingStars = this.shootingStars.filter(s => {
-            s.x += s.vx;
-            s.y += s.vy;
-            s.life--;
+            s.x += s.vx; s.y += s.vy; s.life--;
             return s.life > 0 && s.y < 740;
         });
     }
 
+    // ========== 绘制（委托给主题渲染器）==========
+
     draw() {
-        this.drawBackground();
-        this.drawProps();
-        this.drawBullets();
-        this.drawEnemies();
-        this.drawPlayer();
-        this.drawExplosions();
-        this.drawHUD();
+        const ctx = this.ctx;
+        ctx.save();
+        if (this.screenShake.x !== 0 || this.screenShake.y !== 0) {
+            ctx.translate(this.screenShake.x, this.screenShake.y);
+        }
+
+        // 使用主题渲染器绘制
+        if (this.renderers) {
+            this.renderers.background.draw(ctx, this.stars, this.shootingStars, this.frameCount);
+            this.drawProps();
+            this.drawBullets();
+            this.drawEnemies();
+            this.drawPlayer();
+            this.renderers.effect.draw(ctx, this.explosions);
+            this.drawFloatingTexts();
+            this.drawGlitchChars();
+            this.renderers.ui.drawHUD(ctx, this.player, this.gameTime);
+        } else {
+            // 降级：无渲染器时使用基础绘制
+            this.drawBackground();
+            this.drawProps();
+            this.drawBullets();
+            this.drawEnemies();
+            this.drawPlayer();
+            this.drawExplosions();
+            this.drawFloatingTexts();
+            this.drawGlitchChars();
+            this.drawHUD();
+        }
+
+        // Boss 警告
+        if (this.bossWarning.active) {
+            ctx.fillStyle = 'rgba(255, 0, 0, ' + (this.bossWarning.alpha * 0.3) + ')';
+            ctx.fillRect(0, 0, 480, 720);
+            const pulse = Math.abs(Math.sin(this.frameCount * 0.12));
+            ctx.fillStyle = 'rgba(255, 50, 50, ' + (0.7 + pulse * 0.3) + ')';
+            ctx.font = 'bold 18px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('⚠ WARNING ⚠', 240, 320);
+            ctx.font = '14px monospace';
+            ctx.fillText('BOSS APPROACHING', 240, 350);
+        }
+
+        ctx.restore();
+
+        // 后处理
+        if (this.scanlineCanvas) ctx.drawImage(this.scanlineCanvas, 0, 0);
+        if (this.vignetteCanvas) ctx.drawImage(this.vignetteCanvas, 0, 0);
     }
 
     drawBackground() {
         const ctx = this.ctx;
-
-        // 深空渐变
-        const bgGrad = ctx.createLinearGradient(0, 0, 0, 720);
-        bgGrad.addColorStop(0, '#030518');
-        bgGrad.addColorStop(0.3, '#060822');
-        bgGrad.addColorStop(0.6, '#0a0a2a');
-        bgGrad.addColorStop(1, '#050820');
-        ctx.fillStyle = bgGrad;
+        ctx.fillStyle = '#000000';
         ctx.fillRect(0, 0, 480, 720);
 
-        // 星云
-        this.nebulaClouds.forEach(cloud => {
-            const pulse = Math.sin(cloud.phase) * 0.15 + 0.85;
-            const r = cloud.color.r;
-            const g = cloud.color.g;
-            const b = cloud.color.b;
-            const grad = ctx.createRadialGradient(cloud.x, cloud.y, 0, cloud.x, cloud.y, cloud.radius * pulse);
-            grad.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0.08)`);
-            grad.addColorStop(0.5, `rgba(${r}, ${g}, ${b}, 0.04)`);
-            grad.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
-            ctx.fillStyle = grad;
-            ctx.beginPath();
-            ctx.arc(cloud.x, cloud.y, cloud.radius * pulse, 0, Math.PI * 2);
-            ctx.fill();
-        });
+        ctx.strokeStyle = 'rgba(0, 255, 65, 0.08)';
+        ctx.lineWidth = 0.5;
+        for (let x = 0; x < 480; x += 20) {
+            ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 720); ctx.stroke();
+        }
+        for (let y = 0; y < 720; y += 20) {
+            ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(480, y); ctx.stroke();
+        }
 
-        // 星星
         this.stars.forEach(star => {
-            const flicker = Math.sin(this.frameCount * 0.015 + star.x * 0.5 + star.y * 0.3) * 0.2 + 0.8;
-            const alpha = star.brightness * flicker;
-            // 近景星星有十字光芒
-            if (star.layer === 2 && star.size > 2) {
-                ctx.strokeStyle = `rgba(200, 220, 255, ${alpha * 0.3})`;
-                ctx.lineWidth = 0.5;
-                ctx.beginPath();
-                ctx.moveTo(star.x - star.size * 2, star.y);
-                ctx.lineTo(star.x + star.size * 2, star.y);
-                ctx.moveTo(star.x, star.y - star.size * 2);
-                ctx.lineTo(star.x, star.y + star.size * 2);
-                ctx.stroke();
-            }
-            ctx.fillStyle = star.layer === 2
-                ? `rgba(220, 235, 255, ${alpha})`
-                : star.layer === 1
-                    ? `rgba(180, 200, 240, ${alpha})`
-                    : `rgba(140, 160, 200, ${alpha})`;
-            ctx.beginPath();
-            ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
-            ctx.fill();
-        });
-
-        // 流星
-        this.shootingStars.forEach(s => {
-            const alpha = s.life / s.maxLife;
-            const tailX = s.x - s.vx * (s.length / s.vy);
-            const tailY = s.y - s.length;
-            const grad = ctx.createLinearGradient(s.x, s.y, tailX, tailY);
-            grad.addColorStop(0, `rgba(220, 240, 255, ${alpha * 0.8})`);
-            grad.addColorStop(1, `rgba(150, 180, 255, 0)`);
-            ctx.strokeStyle = grad;
-            ctx.lineWidth = 1.5;
-            ctx.beginPath();
-            ctx.moveTo(s.x, s.y);
-            ctx.lineTo(tailX, tailY);
-            ctx.stroke();
-            // 流星头部发光
-            ctx.fillStyle = `rgba(255, 255, 255, ${alpha * 0.6})`;
-            ctx.beginPath();
-            ctx.arc(s.x, s.y, 1.5, 0, Math.PI * 2);
-            ctx.fill();
+            const flicker = Math.sin(this.frameCount * 0.02 + star.flicker) * 0.3 + 0.7;
+            ctx.fillStyle = 'rgba(0, 255, 65, ' + (flicker * star.brightness) + ')';
+            ctx.fillRect(star.x, star.y, star.size, star.size);
         });
     }
 
-    drawPlayer() { if (this.player) this.player.draw(this.ctx); }
-    drawBullets() { this.bullets.forEach(b => b.draw(this.ctx)); }
-    drawEnemies() { this.enemies.forEach(e => e.draw(this.ctx)); }
-    drawProps() { this.props.forEach(p => p.draw(this.ctx)); }
+    drawPlayer() {
+        if (!this.player) return;
+        if (this.renderers) {
+            this.renderers.player.draw(this.ctx, this.player);
+        } else {
+            this.player.draw(this.ctx);
+        }
+    }
+
+    drawBullets() {
+        if (this.renderers) {
+            this.bullets.forEach(b => this.renderers.bullet.draw(this.ctx, b));
+        } else {
+            this.bullets.forEach(b => b.draw(this.ctx));
+        }
+    }
+
+    drawEnemies() {
+        if (this.renderers) {
+            this.enemies.forEach(e => this.renderers.enemy.draw(this.ctx, e));
+        } else {
+            this.enemies.forEach(e => e.draw(this.ctx));
+        }
+    }
+
+    drawProps() {
+        if (this.renderers) {
+            this.props.forEach(p => this.renderers.prop.draw(this.ctx, p));
+        } else {
+            this.props.forEach(p => p.draw(this.ctx));
+        }
+    }
 
     drawExplosions() {
         const ctx = this.ctx;
         this.explosions.forEach(exp => {
             const progress = exp.timer / exp.maxTimer;
-
-            // 冲击波环
             exp.rings.forEach(ring => {
                 ring.radius += ring.speed;
-                ring.alpha *= 0.95;
+                ring.alpha *= 0.93;
                 if (ring.alpha > 0.01) {
-                    ctx.strokeStyle = `rgba(255, 200, 100, ${ring.alpha})`;
+                    ctx.strokeStyle = 'rgba(0, 255, 65, ' + ring.alpha + ')';
                     ctx.lineWidth = 2 * (1 - progress);
                     ctx.beginPath();
                     ctx.arc(exp.x, exp.y, ring.radius, 0, Math.PI * 2);
                     ctx.stroke();
                 }
             });
-
-            // 中心闪光
-            if (exp.timer < 5) {
-                const flashAlpha = (1 - exp.timer / 5) * 0.6;
-                const flashGrad = ctx.createRadialGradient(exp.x, exp.y, 0, exp.x, exp.y, 20);
-                flashGrad.addColorStop(0, `rgba(255, 255, 220, ${flashAlpha})`);
-                flashGrad.addColorStop(1, `rgba(255, 200, 100, 0)`);
-                ctx.fillStyle = flashGrad;
-                ctx.beginPath();
-                ctx.arc(exp.x, exp.y, 20, 0, Math.PI * 2);
-                ctx.fill();
-            }
-
-            // 粒子
             exp.particles.forEach(p => {
-                if (exp.timer > p.life) return;
-                p.x += p.vx;
-                p.y += p.vy;
-                p.vx *= 0.96;
-                p.vy *= 0.96;
-                const lifeRatio = 1 - exp.timer / p.life;
-                const alpha = lifeRatio;
-                const size = p.size * (1 - progress * 0.4);
-                ctx.globalAlpha = Math.max(0, alpha);
-                ctx.fillStyle = p.color;
-                ctx.shadowColor = p.color;
-                ctx.shadowBlur = 4;
-                ctx.beginPath();
-                ctx.arc(exp.x + p.x, exp.y + p.y, size, 0, Math.PI * 2);
-                ctx.fill();
+                if (exp.timer > 15) return;
+                p.x += p.vx; p.y += p.vy; p.vx *= 0.95; p.vy *= 0.95;
+                const alpha = 1 - exp.timer / 15;
+                ctx.globalAlpha = alpha;
+                if (p.glitch && Math.random() > 0.5) {
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(exp.x + p.x - 3, exp.y + p.y - 1, 6, 2);
+                } else {
+                    ctx.fillStyle = p.color;
+                    ctx.fillRect(exp.x + p.x - p.size, exp.y + p.y - p.size, p.size * 2, p.size * 2);
+                }
             });
-            ctx.shadowBlur = 0;
             ctx.globalAlpha = 1;
         });
+    }
+
+    drawFloatingTexts() {
+        const ctx = this.ctx;
+        this.floatingTexts.forEach(t => {
+            const alpha = t.life / t.maxLife;
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = t.color;
+            ctx.font = 'bold 14px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText(t.text, t.x, t.y);
+        });
+        ctx.globalAlpha = 1;
+    }
+
+    drawGlitchChars() {
+        const ctx = this.ctx;
+        ctx.font = '10px monospace';
+        this.glitchChars.forEach(g => {
+            const alpha = g.life / g.maxLife;
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = '#00ff41';
+            ctx.fillText(g.char, g.x, g.y);
+        });
+        ctx.globalAlpha = 1;
     }
 
     drawHUD() {
@@ -560,4 +701,6 @@ class Game {
     }
 }
 
-window.addEventListener('DOMContentLoaded', () => { new Game(); });
+window.addEventListener('DOMContentLoaded', () => {
+    window.gameInstance = new Game();
+});

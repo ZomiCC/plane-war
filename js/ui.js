@@ -1,4 +1,3 @@
-// UI 管理器
 class UI {
     constructor() {
         this.menuScreen = document.getElementById('menu-screen');
@@ -6,6 +5,8 @@ class UI {
         this.gameoverScreen = document.getElementById('gameover-screen');
         this.finalScoreEl = document.getElementById('final-score');
         this.bestScoreEl = document.getElementById('best-score');
+        this.resultRankEl = document.getElementById('result-rank');
+        this.resultStatsEl = document.getElementById('result-stats');
     }
 
     showMenu() {
@@ -23,93 +24,128 @@ class UI {
     showPause() { this.pauseScreen.classList.remove('hidden'); }
     hidePause() { this.pauseScreen.classList.add('hidden'); }
 
-    showGameOver(score, bestScore) {
-        this.finalScoreEl.textContent = '得分: ' + score;
-        this.bestScoreEl.textContent = '最高分: ' + bestScore;
+    getRank(score) {
+        if (score >= 3000) return 'S';
+        if (score >= 1500) return 'A';
+        if (score >= 800) return 'B';
+        if (score >= 300) return 'C';
+        return 'D';
+    }
+
+    showGameOver(score, bestScore, kills, props, time) {
+        this.finalScoreEl.textContent = score.toString();
+        this.bestScoreEl.textContent = 'BEST: ' + bestScore;
+        
+        if (this.resultRankEl) {
+            const rank = this.getRank(score);
+            this.resultRankEl.textContent = rank;
+            this.resultRankEl.style.animation = 'none';
+            void this.resultRankEl.offsetWidth;
+            this.resultRankEl.style.animation = 'rankGlitch 0.5s ease-out 0.1s both';
+        }
+        
+        if (this.resultStatsEl) {
+            this.resultStatsEl.innerHTML = 
+                '<span>KILLS: ' + kills + '</span>' +
+                '<span>ITEMS: ' + props + '</span>' +
+                '<span>TIME: ' + time + 's</span>';
+        }
+        
         this.gameoverScreen.classList.remove('hidden');
     }
 
     drawHUD(ctx, player, gameTime) {
-        // 半透明顶部面板背景
-        const panelGrad = ctx.createLinearGradient(0, 0, 0, 60);
-        panelGrad.addColorStop(0, 'rgba(0, 0, 20, 0.5)');
-        panelGrad.addColorStop(1, 'rgba(0, 0, 20, 0)');
-        ctx.fillStyle = panelGrad;
-        ctx.fillRect(0, 0, 480, 60);
-
-        // 得分
-        ctx.textAlign = 'left';
-        ctx.fillStyle = 'rgba(150, 180, 200, 0.6)';
-        ctx.font = '11px "Microsoft YaHei", sans-serif';
-        ctx.fillText('SCORE', 14, 18);
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 18px "Microsoft YaHei", sans-serif';
-        ctx.shadowColor = 'rgba(0, 180, 255, 0.3)';
-        ctx.shadowBlur = 6;
-        ctx.fillText(player.score.toString(), 14, 38);
-        ctx.shadowBlur = 0;
-
-        // 生命值（心形图标）
-        ctx.textAlign = 'right';
-        ctx.fillStyle = 'rgba(150, 180, 200, 0.6)';
-        ctx.font = '11px "Microsoft YaHei", sans-serif';
-        ctx.fillText('LIFE', 480 - 14, 18);
-        for (let i = 0; i < player.lives; i++) {
-            this.drawMiniHeart(ctx, 480 - 18 - i * 22, 28);
-        }
-
-        // 等级
         const level = Math.floor(gameTime / 1800) + 1;
+        
+        // 顶部面板 - 终端边框
+        ctx.strokeStyle = '#00ff41';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(8, 8, 464, 36);
+        
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+        ctx.fillRect(9, 9, 462, 34);
+        
+        // SCORE - 左侧
+        ctx.fillStyle = '#00ff41';
+        ctx.font = '10px monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText('SCORE:', 18, 20);
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 16px monospace';
+        ctx.fillText(player.score.toString(), 18, 36);
+        
+        // LEVEL - 中间
+        ctx.fillStyle = '#00ff41';
+        ctx.font = '10px monospace';
         ctx.textAlign = 'center';
-        ctx.fillStyle = 'rgba(150, 180, 200, 0.6)';
-        ctx.font = '11px "Microsoft YaHei", sans-serif';
-        ctx.fillText('LV', 240, 18);
-        ctx.fillStyle = '#88bbdd';
-        ctx.font = 'bold 16px "Microsoft YaHei", sans-serif';
-        ctx.fillText(level.toString(), 240, 36);
-
-        // 护盾指示
-        let statusY = 56;
-        if (player.shield) {
-            ctx.fillStyle = '#00ffc8';
-            ctx.font = '12px "Microsoft YaHei", sans-serif';
-            ctx.textAlign = 'left';
-            ctx.shadowColor = '#00ffc8';
-            ctx.shadowBlur = 4;
-            ctx.fillText('SHIELD', 14, statusY);
-            ctx.shadowBlur = 0;
-            statusY += 16;
+        ctx.fillText('LEVEL:', 240, 20);
+        ctx.fillStyle = '#39ff14';
+        ctx.font = 'bold 14px monospace';
+        ctx.fillText('[' + level + ']', 240, 36);
+        
+        // LIFE - 右侧
+        ctx.fillStyle = '#00ff41';
+        ctx.font = '10px monospace';
+        ctx.textAlign = 'right';
+        ctx.fillText('LIFE:', 462, 20);
+        
+        const heartX = 408;
+        for (let i = 0; i < player.lives; i++) {
+            this.drawHeart(ctx, heartX + i * 16, 30);
         }
-
-        // 道具时间
+        
+        // 护盾状态
+        if (player.shield) {
+            ctx.fillStyle = '#00ff41';
+            ctx.font = '10px monospace';
+            ctx.textAlign = 'left';
+            ctx.fillText('>> SHIELD ACTIVE', 18, 52);
+        }
+        
+        // 道具计时
         if (player.propTimer > 0) {
             const sec = Math.ceil(player.propTimer / 60);
-            ctx.fillStyle = '#00ffaa';
-            ctx.font = '12px "Microsoft YaHei", sans-serif';
+            ctx.fillStyle = '#00ff41';
+            ctx.font = '10px monospace';
             ctx.textAlign = 'left';
-            ctx.shadowColor = '#00ffaa';
-            ctx.shadowBlur = 4;
-            ctx.fillText(player.bulletType === 'double' ? 'DOUBLE ' + sec + 's' : 'POWER ' + sec + 's', 14, statusY);
-            ctx.shadowBlur = 0;
+            ctx.fillText('>> ' + player.bulletType.toUpperCase() + ' [' + sec + 's]', 180, 52);
+        }
+        
+        // Boss 血条
+        var boss = window.gameInstance ? window.gameInstance.enemies.find(e => e.type === 'boss' && e.alive) : null;
+        if (boss) {
+            var barW = 320, barH = 4, barX = (480 - barW) / 2, barY = 56;
+            var hpRatio = boss.hp / boss.maxHp;
+            ctx.strokeStyle = '#00ff41';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(barX, barY, barW, barH);
+            ctx.fillStyle = 'rgba(0, 255, 65, 0.2)';
+            ctx.fillRect(barX + 1, barY + 1, barW - 2, barH - 2);
+            ctx.fillStyle = '#00ff41';
+            ctx.fillRect(barX + 1, barY + 1, (barW - 2) * hpRatio, barH - 2);
+            ctx.fillStyle = '#00ff41';
+            ctx.font = '9px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('[ BOSS: ' + Math.round(hpRatio * 100) + '% ]', 240, barY + 14);
+        } else {
+            // 目标显示
+            ctx.fillStyle = 'rgba(0, 255, 65, 0.4)';
+            ctx.font = '9px monospace';
+            ctx.textAlign = 'center';
+            var nextBoss = window.gameInstance ? window.gameInstance.nextBossScore - (window.gameInstance.player?.score || 0) : 0;
+            ctx.fillText('>> TARGET: ' + (nextBoss > 0 ? nextBoss : 0), 240, 66);
         }
     }
 
-    drawMiniHeart(ctx, x, y) {
-        ctx.save();
-        const grad = ctx.createRadialGradient(x, y + 5, 0, x, y + 5, 8);
-        grad.addColorStop(0, '#ff6688');
-        grad.addColorStop(1, '#cc2244');
-        ctx.fillStyle = grad;
-        ctx.shadowColor = '#ff4466';
-        ctx.shadowBlur = 3;
+    drawHeart(ctx, x, y) {
+        ctx.strokeStyle = '#ff6688';
+        ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.moveTo(x, y + 3);
-        ctx.bezierCurveTo(x, y, x - 4, y - 3, x - 7, y + 1);
-        ctx.bezierCurveTo(x - 11, y + 6, x, y + 13, x, y + 13);
-        ctx.bezierCurveTo(x, y + 13, x + 11, y + 6, x + 7, y + 1);
-        ctx.bezierCurveTo(x + 4, y - 3, x, y, x, y + 3);
-        ctx.fill();
-        ctx.shadowBlur = 0;
-        ctx.restore();
+        ctx.moveTo(x, y - 2);
+        ctx.bezierCurveTo(x, y - 5, x - 3, y - 7, x - 5, y - 4);
+        ctx.bezierCurveTo(x - 8, y - 1, x, y + 4, x, y + 4);
+        ctx.bezierCurveTo(x, y + 4, x + 8, y - 1, x + 5, y - 4);
+        ctx.bezierCurveTo(x + 3, y - 7, x, y - 5, x, y - 2);
+        ctx.stroke();
     }
 }
