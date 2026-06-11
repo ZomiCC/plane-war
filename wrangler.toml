@@ -2,15 +2,10 @@ name = "plane-war"
 compatibility_date = "2024-01-01"
 
 [site]
-bucket = "."
+bucket = "dist"
 
-# 排除不需要部署的文件
 exclude = [
   ".git/**",
   ".claude/**",
   "node_modules/**",
-  "wrangler.toml",
-  "test.html",
-  "mini-test.html",
-  "README.md",
 ]
